@@ -72,7 +72,7 @@ Retrieves a stream from the backend, for reading
 
 ##### Returns
 
-A `stream.ReadStream` to read the data.
+A `stream.Readable` to read the data.
 
 ##### Notes
 
