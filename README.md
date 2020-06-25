@@ -2,7 +2,7 @@
 
 Stores arbitrary objects in multiple backends, with support for falling back to a secondary backend if the object can't be found in the primary.
 
-Contains a workaround within the GCS backend to allowlifecycle rules to keep objects for a set period of time from deletion, which can't currently be accomplished with GCS's own rules. (See configuration-specific notes later)
+Contains a workaround within the GCS backend to allow lifecycle rules to keep objects for a set period of time from deletion, which can't currently be accomplished with GCS's own rules. (See configuration-specific notes later)
 
 ## Backends available
 
