@@ -34,36 +34,32 @@ describe('MigrationPersistorTests', function () {
 
     newPersistor = function (hasFile) {
       return {
-        promises: {
-          sendFile: sinon.stub().resolves(),
-          sendStream: sinon.stub().resolves(),
-          getObjectStream: hasFile
-            ? sinon.stub().resolves(fileStream)
-            : sinon.stub().rejects(notFoundError),
-          deleteDirectory: sinon.stub().resolves(),
-          getObjectSize: hasFile
-            ? sinon.stub().resolves(size)
-            : sinon.stub().rejects(notFoundError),
-          deleteObject: sinon.stub().resolves(),
-          copyObject: hasFile
-            ? sinon.stub().resolves()
-            : sinon.stub().rejects(notFoundError),
-          checkIfObjectExists: sinon.stub().resolves(hasFile),
-          directorySize: hasFile
-            ? sinon.stub().resolves(size)
-            : sinon.stub().rejects(notFoundError),
-          getObjectMd5Hash: hasFile
-            ? sinon.stub().resolves(md5)
-            : sinon.stub().rejects(notFoundError)
-        }
+        sendFile: sinon.stub().resolves(),
+        sendStream: sinon.stub().resolves(),
+        getObjectStream: hasFile
+          ? sinon.stub().resolves(fileStream)
+          : sinon.stub().rejects(notFoundError),
+        deleteDirectory: sinon.stub().resolves(),
+        getObjectSize: hasFile
+          ? sinon.stub().resolves(size)
+          : sinon.stub().rejects(notFoundError),
+        deleteObject: sinon.stub().resolves(),
+        copyObject: hasFile
+          ? sinon.stub().resolves()
+          : sinon.stub().rejects(notFoundError),
+        checkIfObjectExists: sinon.stub().resolves(hasFile),
+        directorySize: hasFile
+          ? sinon.stub().resolves(size)
+          : sinon.stub().rejects(notFoundError),
+        getObjectMd5Hash: hasFile
+          ? sinon.stub().resolves(md5)
+          : sinon.stub().rejects(notFoundError)
       }
     }
 
     Settings = {
-      fallback: {
-        buckets: {
-          [bucket]: fallbackBucket
-        }
+      buckets: {
+        [bucket]: fallbackBucket
       }
     }
 
@@ -78,7 +74,6 @@ describe('MigrationPersistorTests', function () {
 
     MigrationPersistor = SandboxedModule.require(modulePath, {
       requires: {
-        './Settings': Settings,
         stream: Stream,
         './Errors': Errors,
         'logger-sharelatex': Logger
@@ -94,11 +89,12 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(true)
         fallbackPersistor = newPersistor(false)
-        migrationPersistor = MigrationPersistor(
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
-        response = await migrationPersistor.promises.getObjectStream(
+        response = await migrationPersistor.getObjectStream(
           bucket,
           key,
           options
@@ -110,14 +106,15 @@ describe('MigrationPersistorTests', function () {
       })
 
       it('should fetch the file from the primary persistor, with the correct options', function () {
-        expect(
-          primaryPersistor.promises.getObjectStream
-        ).to.have.been.calledWithExactly(bucket, key, options)
+        expect(primaryPersistor.getObjectStream).to.have.been.calledWithExactly(
+          bucket,
+          key,
+          options
+        )
       })
 
       it('should not query the fallback persistor', function () {
-        expect(fallbackPersistor.promises.getObjectStream).not.to.have.been
-          .called
+        expect(fallbackPersistor.getObjectStream).not.to.have.been.called
       })
     })
 
@@ -126,11 +123,12 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(false)
         fallbackPersistor = newPersistor(true)
-        migrationPersistor = MigrationPersistor(
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
-        response = await migrationPersistor.promises.getObjectStream(
+        response = await migrationPersistor.getObjectStream(
           bucket,
           key,
           options
@@ -142,24 +140,25 @@ describe('MigrationPersistorTests', function () {
       })
 
       it('should fetch the file from the primary persistor with the correct options', function () {
-        expect(
-          primaryPersistor.promises.getObjectStream
-        ).to.have.been.calledWithExactly(bucket, key, options)
+        expect(primaryPersistor.getObjectStream).to.have.been.calledWithExactly(
+          bucket,
+          key,
+          options
+        )
       })
 
       it('should fetch the file from the fallback persistor with the fallback bucket with the correct options', function () {
         expect(
-          fallbackPersistor.promises.getObjectStream
+          fallbackPersistor.getObjectStream
         ).to.have.been.calledWithExactly(fallbackBucket, key, options)
       })
 
       it('should create one read stream', function () {
-        expect(fallbackPersistor.promises.getObjectStream).to.have.been
-          .calledOnce
+        expect(fallbackPersistor.getObjectStream).to.have.been.calledOnce
       })
 
       it('should not send the file to the primary', function () {
-        expect(primaryPersistor.promises.sendStream).not.to.have.been.called
+        expect(primaryPersistor.sendStream).not.to.have.been.called
       })
     })
 
@@ -171,12 +170,13 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(false)
         fallbackPersistor = newPersistor(true)
-        migrationPersistor = MigrationPersistor(
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
-        Settings.fallback.copyOnMiss = true
-        returnedStream = await migrationPersistor.promises.getObjectStream(
+        Settings.copyOnMiss = true
+        returnedStream = await migrationPersistor.getObjectStream(
           bucket,
           key,
           options
@@ -184,20 +184,18 @@ describe('MigrationPersistorTests', function () {
       })
 
       it('should create one read stream', function () {
-        expect(fallbackPersistor.promises.getObjectStream).to.have.been
-          .calledOnce
+        expect(fallbackPersistor.getObjectStream).to.have.been.calledOnce
       })
 
       it('should get the md5 hash from the source', function () {
-        expect(
-          fallbackPersistor.promises.getObjectMd5Hash
-        ).to.have.been.calledWith(fallbackBucket, key)
+        expect(fallbackPersistor.getObjectMd5Hash).to.have.been.calledWith(
+          fallbackBucket,
+          key
+        )
       })
 
       it('should send a stream to the primary', function () {
-        expect(
-          primaryPersistor.promises.sendStream
-        ).to.have.been.calledWithExactly(
+        expect(primaryPersistor.sendStream).to.have.been.calledWithExactly(
           bucket,
           key,
           sinon.match.instanceOf(Stream.PassThrough),
@@ -212,12 +210,13 @@ describe('MigrationPersistorTests', function () {
 
     describe('when neither persistor has the file', function () {
       it('rejects with a NotFoundError', async function () {
-        const migrationPersistor = MigrationPersistor(
+        const migrationPersistor = new MigrationPersistor(
           newPersistor(false),
-          newPersistor(false)
+          newPersistor(false),
+          Settings
         )
         return expect(
-          migrationPersistor.promises.getObjectStream(bucket, key)
+          migrationPersistor.getObjectStream(bucket, key)
         ).to.eventually.be.rejected.and.be.an.instanceOf(Errors.NotFoundError)
       })
     })
@@ -227,19 +226,14 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(false)
         fallbackPersistor = newPersistor(true)
-        primaryPersistor.promises.getObjectStream = sinon
-          .stub()
-          .rejects(genericError)
-        migrationPersistor = MigrationPersistor(
+        primaryPersistor.getObjectStream = sinon.stub().rejects(genericError)
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
         try {
-          await migrationPersistor.promises.getObjectStream(
-            bucket,
-            key,
-            options
-          )
+          await migrationPersistor.getObjectStream(bucket, key, options)
         } catch (err) {
           error = err
         }
@@ -250,8 +244,7 @@ describe('MigrationPersistorTests', function () {
       })
 
       it('does not call the fallback', function () {
-        expect(fallbackPersistor.promises.getObjectStream).not.to.have.been
-          .called
+        expect(fallbackPersistor.getObjectStream).not.to.have.been.called
       })
     })
 
@@ -260,19 +253,14 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(false)
         fallbackPersistor = newPersistor(false)
-        fallbackPersistor.promises.getObjectStream = sinon
-          .stub()
-          .rejects(genericError)
-        migrationPersistor = MigrationPersistor(
+        fallbackPersistor.getObjectStream = sinon.stub().rejects(genericError)
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
         try {
-          await migrationPersistor.promises.getObjectStream(
-            bucket,
-            key,
-            options
-          )
+          await migrationPersistor.getObjectStream(bucket, key, options)
         } catch (err) {
           error = err
         }
@@ -283,9 +271,10 @@ describe('MigrationPersistorTests', function () {
       })
 
       it('should have called the fallback', function () {
-        expect(
-          fallbackPersistor.promises.getObjectStream
-        ).to.have.been.calledWith(fallbackBucket, key)
+        expect(fallbackPersistor.getObjectStream).to.have.been.calledWith(
+          fallbackBucket,
+          key
+        )
       })
     })
   })
@@ -295,33 +284,36 @@ describe('MigrationPersistorTests', function () {
     beforeEach(function () {
       primaryPersistor = newPersistor(false)
       fallbackPersistor = newPersistor(false)
-      migrationPersistor = MigrationPersistor(
+      migrationPersistor = new MigrationPersistor(
         primaryPersistor,
-        fallbackPersistor
+        fallbackPersistor,
+        Settings
       )
     })
 
     describe('when it works', function () {
       beforeEach(async function () {
-        return migrationPersistor.promises.sendStream(bucket, key, fileStream)
+        return migrationPersistor.sendStream(bucket, key, fileStream)
       })
 
       it('should send the file to the primary persistor', function () {
-        expect(
-          primaryPersistor.promises.sendStream
-        ).to.have.been.calledWithExactly(bucket, key, fileStream)
+        expect(primaryPersistor.sendStream).to.have.been.calledWithExactly(
+          bucket,
+          key,
+          fileStream
+        )
       })
 
       it('should not send the file to the fallback persistor', function () {
-        expect(fallbackPersistor.promises.sendStream).not.to.have.been.called
+        expect(fallbackPersistor.sendStream).not.to.have.been.called
       })
     })
 
     describe('when the primary persistor throws an error', function () {
       it('returns the error', async function () {
-        primaryPersistor.promises.sendStream.rejects(notFoundError)
+        primaryPersistor.sendStream.rejects(notFoundError)
         return expect(
-          migrationPersistor.promises.sendStream(bucket, key, fileStream)
+          migrationPersistor.sendStream(bucket, key, fileStream)
         ).to.eventually.be.rejected.and.be.an.instanceOf(Errors.NotFoundError)
       })
     })
@@ -332,36 +324,39 @@ describe('MigrationPersistorTests', function () {
     beforeEach(function () {
       primaryPersistor = newPersistor(false)
       fallbackPersistor = newPersistor(false)
-      migrationPersistor = MigrationPersistor(
+      migrationPersistor = new MigrationPersistor(
         primaryPersistor,
-        fallbackPersistor
+        fallbackPersistor,
+        Settings
       )
     })
 
     describe('when it works', function () {
       beforeEach(async function () {
-        return migrationPersistor.promises.deleteObject(bucket, key)
+        return migrationPersistor.deleteObject(bucket, key)
       })
 
       it('should delete the file from the primary', function () {
-        expect(
-          primaryPersistor.promises.deleteObject
-        ).to.have.been.calledWithExactly(bucket, key)
+        expect(primaryPersistor.deleteObject).to.have.been.calledWithExactly(
+          bucket,
+          key
+        )
       })
 
       it('should delete the file from the fallback', function () {
-        expect(
-          fallbackPersistor.promises.deleteObject
-        ).to.have.been.calledWithExactly(fallbackBucket, key)
+        expect(fallbackPersistor.deleteObject).to.have.been.calledWithExactly(
+          fallbackBucket,
+          key
+        )
       })
     })
 
     describe('when the primary persistor throws an error', function () {
       let error
       beforeEach(async function () {
-        primaryPersistor.promises.deleteObject.rejects(genericError)
+        primaryPersistor.deleteObject.rejects(genericError)
         try {
-          await migrationPersistor.promises.deleteObject(bucket, key)
+          await migrationPersistor.deleteObject(bucket, key)
         } catch (err) {
           error = err
         }
@@ -372,24 +367,26 @@ describe('MigrationPersistorTests', function () {
       })
 
       it('should delete the file from the primary', function () {
-        expect(
-          primaryPersistor.promises.deleteObject
-        ).to.have.been.calledWithExactly(bucket, key)
+        expect(primaryPersistor.deleteObject).to.have.been.calledWithExactly(
+          bucket,
+          key
+        )
       })
 
       it('should delete the file from the fallback', function () {
-        expect(
-          fallbackPersistor.promises.deleteObject
-        ).to.have.been.calledWithExactly(fallbackBucket, key)
+        expect(fallbackPersistor.deleteObject).to.have.been.calledWithExactly(
+          fallbackBucket,
+          key
+        )
       })
     })
 
     describe('when the fallback persistor throws an error', function () {
       let error
       beforeEach(async function () {
-        fallbackPersistor.promises.deleteObject.rejects(genericError)
+        fallbackPersistor.deleteObject.rejects(genericError)
         try {
-          await migrationPersistor.promises.deleteObject(bucket, key)
+          await migrationPersistor.deleteObject(bucket, key)
         } catch (err) {
           error = err
         }
@@ -400,15 +397,17 @@ describe('MigrationPersistorTests', function () {
       })
 
       it('should delete the file from the primary', function () {
-        expect(
-          primaryPersistor.promises.deleteObject
-        ).to.have.been.calledWithExactly(bucket, key)
+        expect(primaryPersistor.deleteObject).to.have.been.calledWithExactly(
+          bucket,
+          key
+        )
       })
 
       it('should delete the file from the fallback', function () {
-        expect(
-          fallbackPersistor.promises.deleteObject
-        ).to.have.been.calledWithExactly(fallbackBucket, key)
+        expect(fallbackPersistor.deleteObject).to.have.been.calledWithExactly(
+          fallbackBucket,
+          key
+        )
       })
     })
   })
@@ -419,22 +418,24 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(true)
         fallbackPersistor = newPersistor(false)
-        migrationPersistor = MigrationPersistor(
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
-        return migrationPersistor.promises.copyObject(bucket, key, destKey)
+        return migrationPersistor.copyObject(bucket, key, destKey)
       })
 
       it('should call copyObject to copy the file', function () {
-        expect(
-          primaryPersistor.promises.copyObject
-        ).to.have.been.calledWithExactly(bucket, key, destKey)
+        expect(primaryPersistor.copyObject).to.have.been.calledWithExactly(
+          bucket,
+          key,
+          destKey
+        )
       })
 
       it('should not try to read from the fallback', function () {
-        expect(fallbackPersistor.promises.getObjectStream).not.to.have.been
-          .called
+        expect(fallbackPersistor.getObjectStream).not.to.have.been.called
       })
     })
 
@@ -443,35 +444,37 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(false)
         fallbackPersistor = newPersistor(true)
-        migrationPersistor = MigrationPersistor(
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
-        return migrationPersistor.promises.copyObject(bucket, key, destKey)
+        return migrationPersistor.copyObject(bucket, key, destKey)
       })
 
       it('should call copyObject to copy the file', function () {
-        expect(
-          primaryPersistor.promises.copyObject
-        ).to.have.been.calledWithExactly(bucket, key, destKey)
+        expect(primaryPersistor.copyObject).to.have.been.calledWithExactly(
+          bucket,
+          key,
+          destKey
+        )
       })
 
       it('should fetch the file from the fallback', function () {
         expect(
-          fallbackPersistor.promises.getObjectStream
+          fallbackPersistor.getObjectStream
         ).not.to.have.been.calledWithExactly(fallbackBucket, key)
       })
 
       it('should get the md5 hash from the source', function () {
-        expect(
-          fallbackPersistor.promises.getObjectMd5Hash
-        ).to.have.been.calledWith(fallbackBucket, key)
+        expect(fallbackPersistor.getObjectMd5Hash).to.have.been.calledWith(
+          fallbackBucket,
+          key
+        )
       })
 
       it('should send the file to the primary', function () {
-        expect(
-          primaryPersistor.promises.sendStream
-        ).to.have.been.calledWithExactly(
+        expect(primaryPersistor.sendStream).to.have.been.calledWithExactly(
           bucket,
           destKey,
           sinon.match.instanceOf(Stream.PassThrough),
@@ -485,26 +488,29 @@ describe('MigrationPersistorTests', function () {
       beforeEach(async function () {
         primaryPersistor = newPersistor(false)
         fallbackPersistor = newPersistor(false)
-        migrationPersistor = MigrationPersistor(
+        migrationPersistor = new MigrationPersistor(
           primaryPersistor,
-          fallbackPersistor
+          fallbackPersistor,
+          Settings
         )
         try {
-          await migrationPersistor.promises.copyObject(bucket, key, destKey)
+          await migrationPersistor.copyObject(bucket, key, destKey)
         } catch (err) {
           error = err
         }
       })
 
       it('should call copyObject to copy the file', function () {
-        expect(
-          primaryPersistor.promises.copyObject
-        ).to.have.been.calledWithExactly(bucket, key, destKey)
+        expect(primaryPersistor.copyObject).to.have.been.calledWithExactly(
+          bucket,
+          key,
+          destKey
+        )
       })
 
       it('should fetch the file from the fallback', function () {
         expect(
-          fallbackPersistor.promises.getObjectStream
+          fallbackPersistor.getObjectStream
         ).not.to.have.been.calledWithExactly(fallbackBucket, key)
       })
 

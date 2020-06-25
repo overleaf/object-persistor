@@ -48,15 +48,9 @@ describe('S3PersistorTests', function () {
 
   beforeEach(function () {
     settings = {
-      backend: 's3',
-      s3: {
-        secret: defaultS3Secret,
-        key: defaultS3Key,
-        partSize: 100 * 1024 * 1024
-      },
-      stores: {
-        user_files: 'sl_user_files'
-      }
+      secret: defaultS3Secret,
+      key: defaultS3Key,
+      partSize: 100 * 1024 * 1024
     }
 
     Transform = class {
@@ -155,10 +149,9 @@ describe('S3PersistorTests', function () {
       warn: sinon.stub()
     }
 
-    S3Persistor = SandboxedModule.require(modulePath, {
+    S3Persistor = new (SandboxedModule.require(modulePath, {
       requires: {
         'aws-sdk/clients/s3': S3,
-        './Settings': settings,
         'logger-sharelatex': Logger,
         './Errors': Errors,
         fs: Fs,
@@ -167,7 +160,7 @@ describe('S3PersistorTests', function () {
         crypto
       },
       globals: { console, Buffer }
-    })
+    }))(settings)
   })
 
   describe('getObjectStream', function () {
@@ -175,7 +168,7 @@ describe('S3PersistorTests', function () {
       let stream
 
       beforeEach(async function () {
-        stream = await S3Persistor.promises.getObjectStream(bucket, key)
+        stream = await S3Persistor.getObjectStream(bucket, key)
       })
 
       it('returns a metered stream', function () {
@@ -204,7 +197,7 @@ describe('S3PersistorTests', function () {
       let stream
 
       beforeEach(async function () {
-        stream = await S3Persistor.promises.getObjectStream(bucket, key, {
+        stream = await S3Persistor.getObjectStream(bucket, key, {
           start: 5,
           end: 10
         })
@@ -235,13 +228,13 @@ describe('S3PersistorTests', function () {
       }
 
       beforeEach(async function () {
-        settings.s3BucketCreds = {}
-        settings.s3BucketCreds[bucket] = {
+        settings.bucketCreds = {}
+        settings.bucketCreds[bucket] = {
           auth_key: alternativeKey,
           auth_secret: alternativeSecret
         }
 
-        stream = await S3Persistor.promises.getObjectStream(bucket, key)
+        stream = await S3Persistor.getObjectStream(bucket, key)
       })
 
       it('returns a metered stream', function () {
@@ -260,16 +253,13 @@ describe('S3PersistorTests', function () {
       })
 
       it('caches the credentials', async function () {
-        stream = await S3Persistor.promises.getObjectStream(bucket, key)
+        stream = await S3Persistor.getObjectStream(bucket, key)
 
         expect(S3).to.have.been.calledOnceWith(alternativeS3Credentials)
       })
 
       it('uses the default credentials for an unknown bucket', async function () {
-        stream = await S3Persistor.promises.getObjectStream(
-          'anotherBucket',
-          key
-        )
+        stream = await S3Persistor.getObjectStream('anotherBucket', key)
 
         expect(S3).to.have.been.calledTwice
         expect(S3.firstCall).to.have.been.calledWith(alternativeS3Credentials)
@@ -277,14 +267,8 @@ describe('S3PersistorTests', function () {
       })
 
       it('caches the default credentials', async function () {
-        stream = await S3Persistor.promises.getObjectStream(
-          'anotherBucket',
-          key
-        )
-        stream = await S3Persistor.promises.getObjectStream(
-          'anotherBucket',
-          key
-        )
+        stream = await S3Persistor.getObjectStream('anotherBucket', key)
+        stream = await S3Persistor.getObjectStream('anotherBucket', key)
 
         expect(S3).to.have.been.calledTwice
         expect(S3.firstCall).to.have.been.calledWith(alternativeS3Credentials)
@@ -292,11 +276,11 @@ describe('S3PersistorTests', function () {
       })
 
       it('throws an error if there are no credentials for the bucket', async function () {
-        delete settings.s3.key
-        delete settings.s3.secret
+        delete settings.key
+        delete settings.secret
 
         await expect(
-          S3Persistor.promises.getObjectStream('anotherBucket', key)
+          S3Persistor.getObjectStream('anotherBucket', key)
         ).to.eventually.be.rejected.and.be.an.instanceOf(Errors.SettingsError)
       })
     })
@@ -308,7 +292,7 @@ describe('S3PersistorTests', function () {
         Transform.prototype.on = sinon.stub()
         S3ReadStream.on.withArgs('error').yields(S3NotFoundError)
         try {
-          stream = await S3Persistor.promises.getObjectStream(bucket, key)
+          stream = await S3Persistor.getObjectStream(bucket, key)
         } catch (err) {
           error = err
         }
@@ -338,7 +322,7 @@ describe('S3PersistorTests', function () {
         Transform.prototype.on = sinon.stub()
         S3ReadStream.on.withArgs('error').yields(S3AccessDeniedError)
         try {
-          stream = await S3Persistor.promises.getObjectStream(bucket, key)
+          stream = await S3Persistor.getObjectStream(bucket, key)
         } catch (err) {
           error = err
         }
@@ -368,7 +352,7 @@ describe('S3PersistorTests', function () {
         Transform.prototype.on = sinon.stub()
         S3ReadStream.on.withArgs('error').yields(genericError)
         try {
-          stream = await S3Persistor.promises.getObjectStream(bucket, key)
+          stream = await S3Persistor.getObjectStream(bucket, key)
         } catch (err) {
           error = err
         }
@@ -397,7 +381,7 @@ describe('S3PersistorTests', function () {
       let size
 
       beforeEach(async function () {
-        size = await S3Persistor.promises.getObjectSize(bucket, key)
+        size = await S3Persistor.getObjectSize(bucket, key)
       })
 
       it('should return the object size', function () {
@@ -420,7 +404,7 @@ describe('S3PersistorTests', function () {
           promise: sinon.stub().rejects(S3NotFoundError)
         })
         try {
-          await S3Persistor.promises.getObjectSize(bucket, key)
+          await S3Persistor.getObjectSize(bucket, key)
         } catch (err) {
           error = err
         }
@@ -443,7 +427,7 @@ describe('S3PersistorTests', function () {
           promise: sinon.stub().rejects(genericError)
         })
         try {
-          await S3Persistor.promises.getObjectSize(bucket, key)
+          await S3Persistor.getObjectSize(bucket, key)
         } catch (err) {
           error = err
         }
@@ -462,7 +446,7 @@ describe('S3PersistorTests', function () {
   describe('sendStream', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return S3Persistor.promises.sendStream(bucket, key, ReadStream)
+        return S3Persistor.sendStream(bucket, key, ReadStream)
       })
 
       it('should upload the stream', function () {
@@ -493,7 +477,7 @@ describe('S3PersistorTests', function () {
 
     describe('when a hash is supploed', function () {
       beforeEach(async function () {
-        return S3Persistor.promises.sendStream(
+        return S3Persistor.sendStream(
           bucket,
           key,
           ReadStream,
@@ -526,7 +510,7 @@ describe('S3PersistorTests', function () {
           promise: sinon.stub().rejects(genericError)
         })
         try {
-          await S3Persistor.promises.sendStream(bucket, key, ReadStream)
+          await S3Persistor.sendStream(bucket, key, ReadStream)
         } catch (err) {
           error = err
         }
@@ -547,7 +531,7 @@ describe('S3PersistorTests', function () {
           })
         })
 
-        await S3Persistor.promises.sendStream(bucket, key, ReadStream)
+        await S3Persistor.sendStream(bucket, key, ReadStream)
       })
 
       it('should re-fetch the file to verify it', function () {
@@ -572,7 +556,7 @@ describe('S3PersistorTests', function () {
   describe('sendFile', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return S3Persistor.promises.sendFile(bucket, key, filename)
+        return S3Persistor.sendFile(bucket, key, filename)
       })
 
       it('should create a read stream for the file', function () {
@@ -592,7 +576,7 @@ describe('S3PersistorTests', function () {
   describe('copyObject', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return S3Persistor.promises.copyObject(bucket, key, destKey)
+        return S3Persistor.copyObject(bucket, key, destKey)
       })
 
       it('should copy the object', function () {
@@ -612,7 +596,7 @@ describe('S3PersistorTests', function () {
           promise: sinon.stub().rejects(S3NotFoundError)
         })
         try {
-          await S3Persistor.promises.copyObject(bucket, key, destKey)
+          await S3Persistor.copyObject(bucket, key, destKey)
         } catch (err) {
           error = err
         }
@@ -627,7 +611,7 @@ describe('S3PersistorTests', function () {
   describe('deleteObject', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return S3Persistor.promises.deleteObject(bucket, key)
+        return S3Persistor.deleteObject(bucket, key)
       })
 
       it('should delete the object', function () {
@@ -642,7 +626,7 @@ describe('S3PersistorTests', function () {
   describe('deleteDirectory', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return S3Persistor.promises.deleteDirectory(bucket, key)
+        return S3Persistor.deleteDirectory(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
@@ -668,7 +652,7 @@ describe('S3PersistorTests', function () {
         S3Client.listObjects = sinon
           .stub()
           .returns({ promise: sinon.stub().resolves({ Contents: [] }) })
-        return S3Persistor.promises.deleteDirectory(bucket, key)
+        return S3Persistor.deleteDirectory(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
@@ -691,7 +675,7 @@ describe('S3PersistorTests', function () {
           .stub()
           .returns({ promise: sinon.stub().rejects(genericError) })
         try {
-          await S3Persistor.promises.deleteDirectory(bucket, key)
+          await S3Persistor.deleteDirectory(bucket, key)
         } catch (err) {
           error = err
         }
@@ -718,7 +702,7 @@ describe('S3PersistorTests', function () {
           .stub()
           .returns({ promise: sinon.stub().rejects(genericError) })
         try {
-          await S3Persistor.promises.deleteDirectory(bucket, key)
+          await S3Persistor.deleteDirectory(bucket, key)
         } catch (err) {
           error = err
         }
@@ -739,7 +723,7 @@ describe('S3PersistorTests', function () {
       let size
 
       beforeEach(async function () {
-        size = await S3Persistor.promises.directorySize(bucket, key)
+        size = await S3Persistor.directorySize(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
@@ -761,7 +745,7 @@ describe('S3PersistorTests', function () {
         S3Client.listObjects = sinon
           .stub()
           .returns({ promise: sinon.stub().resolves({ Contents: [] }) })
-        size = await S3Persistor.promises.directorySize(bucket, key)
+        size = await S3Persistor.directorySize(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
@@ -784,7 +768,7 @@ describe('S3PersistorTests', function () {
           .stub()
           .returns({ promise: sinon.stub().rejects(genericError) })
         try {
-          await S3Persistor.promises.directorySize(bucket, key)
+          await S3Persistor.directorySize(bucket, key)
         } catch (err) {
           error = err
         }
@@ -805,7 +789,7 @@ describe('S3PersistorTests', function () {
       let exists
 
       beforeEach(async function () {
-        exists = await S3Persistor.promises.checkIfObjectExists(bucket, key)
+        exists = await S3Persistor.checkIfObjectExists(bucket, key)
       })
 
       it('should get the object header', function () {
@@ -827,7 +811,7 @@ describe('S3PersistorTests', function () {
         S3Client.headObject = sinon
           .stub()
           .returns({ promise: sinon.stub().rejects(S3NotFoundError) })
-        exists = await S3Persistor.promises.checkIfObjectExists(bucket, key)
+        exists = await S3Persistor.checkIfObjectExists(bucket, key)
       })
 
       it('should get the object header', function () {
@@ -850,7 +834,7 @@ describe('S3PersistorTests', function () {
           .stub()
           .returns({ promise: sinon.stub().rejects(genericError) })
         try {
-          await S3Persistor.promises.checkIfObjectExists(bucket, key)
+          await S3Persistor.checkIfObjectExists(bucket, key)
         } catch (err) {
           error = err
         }

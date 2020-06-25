@@ -1,6 +1,5 @@
 const Crypto = require('crypto')
 const Stream = require('stream')
-const Settings = require('./Settings')
 const Logger = require('logger-sharelatex')
 const { WriteError, ReadError, NotFoundError } = require('./Errors')
 const { promisify } = require('util')
@@ -24,9 +23,9 @@ class ObserverStream extends Stream.Transform {
       this.hash = Crypto.createHash(options.hash)
     }
 
-    if (options.metric && Settings.Metrics) {
+    if (options.metric && options.Metrics) {
       const onEnd = () => {
-        Settings.Metrics.count(options.metric, this.bytes)
+        options.Metrics.count(options.metric, this.bytes)
       }
       this.once('error', onEnd)
       this.once('end', onEnd)
@@ -71,12 +70,12 @@ function calculateStreamMd5(stream) {
 // throws an error
 async function verifyMd5(persistor, bucket, key, sourceMd5, destMd5 = null) {
   if (!destMd5) {
-    destMd5 = await persistor.promises.getObjectMd5Hash(bucket, key)
+    destMd5 = await persistor.getObjectMd5Hash(bucket, key)
   }
 
   if (sourceMd5 !== destMd5) {
     try {
-      await persistor.promises.deleteObject(bucket, key)
+      await persistor.deleteObject(bucket, key)
     } catch (err) {
       Logger.warn(err, 'error deleting file for invalid upload')
     }

@@ -37,13 +37,7 @@ describe('GcsPersistorTests', function () {
 
   beforeEach(function () {
     Settings = {
-      backend: 'gcs',
-      stores: {
-        user_files: 'user_files'
-      },
-      gcs: {
-        directoryKeyRegex: /^[0-9a-fA-F]{24}\/[0-9a-fA-F]{24}/
-      },
+      directoryKeyRegex: /^[0-9a-fA-F]{24}\/[0-9a-fA-F]{24}/,
       Metrics: {
         count: sinon.stub()
       }
@@ -134,10 +128,9 @@ describe('GcsPersistorTests', function () {
       warn: sinon.stub()
     }
 
-    GcsPersistor = SandboxedModule.require(modulePath, {
+    GcsPersistor = new (SandboxedModule.require(modulePath, {
       requires: {
         '@google-cloud/storage': { Storage },
-        './Settings': Settings,
         'logger-sharelatex': Logger,
         'tiny-async-pool': asyncPool,
         './Errors': Errors,
@@ -146,7 +139,7 @@ describe('GcsPersistorTests', function () {
         crypto
       },
       globals: { console, Buffer }
-    })
+    }))(Settings)
   })
 
   describe('getObjectStream', function () {
@@ -154,7 +147,7 @@ describe('GcsPersistorTests', function () {
       let stream
 
       beforeEach(async function () {
-        stream = await GcsPersistor.promises.getObjectStream(bucket, key)
+        stream = await GcsPersistor.getObjectStream(bucket, key)
       })
 
       it('returns a metered stream', function () {
@@ -178,7 +171,7 @@ describe('GcsPersistorTests', function () {
       let stream
 
       beforeEach(async function () {
-        stream = await GcsPersistor.promises.getObjectStream(bucket, key, {
+        stream = await GcsPersistor.getObjectStream(bucket, key, {
           start: 5,
           end: 10
         })
@@ -203,7 +196,7 @@ describe('GcsPersistorTests', function () {
         Transform.prototype.on = sinon.stub()
         ReadStream.on.withArgs('error').yields(GcsNotFoundError)
         try {
-          stream = await GcsPersistor.promises.getObjectStream(bucket, key)
+          stream = await GcsPersistor.getObjectStream(bucket, key)
         } catch (e) {
           error = e
         }
@@ -233,7 +226,7 @@ describe('GcsPersistorTests', function () {
         Transform.prototype.on = sinon.stub()
         ReadStream.on.withArgs('error').yields(genericError)
         try {
-          stream = await GcsPersistor.promises.getObjectStream(bucket, key)
+          stream = await GcsPersistor.getObjectStream(bucket, key)
         } catch (err) {
           error = err
         }
@@ -261,7 +254,7 @@ describe('GcsPersistorTests', function () {
     let signedUrl
 
     beforeEach(async function () {
-      signedUrl = await GcsPersistor.promises.getRedirectUrl(bucket, key)
+      signedUrl = await GcsPersistor.getRedirectUrl(bucket, key)
     })
 
     it('should request a signed URL', function () {
@@ -278,7 +271,7 @@ describe('GcsPersistorTests', function () {
       let size
 
       beforeEach(async function () {
-        size = await GcsPersistor.promises.getObjectSize(bucket, key)
+        size = await GcsPersistor.getObjectSize(bucket, key)
       })
 
       it('should return the object size', function () {
@@ -298,7 +291,7 @@ describe('GcsPersistorTests', function () {
       beforeEach(async function () {
         GcsFile.getMetadata = sinon.stub().rejects(GcsNotFoundError)
         try {
-          await GcsPersistor.promises.getObjectSize(bucket, key)
+          await GcsPersistor.getObjectSize(bucket, key)
         } catch (err) {
           error = err
         }
@@ -319,7 +312,7 @@ describe('GcsPersistorTests', function () {
       beforeEach(async function () {
         GcsFile.getMetadata = sinon.stub().rejects(genericError)
         try {
-          await GcsPersistor.promises.getObjectSize(bucket, key)
+          await GcsPersistor.getObjectSize(bucket, key)
         } catch (err) {
           error = err
         }
@@ -338,7 +331,7 @@ describe('GcsPersistorTests', function () {
   describe('sendStream', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return GcsPersistor.promises.sendStream(bucket, key, ReadStream)
+        return GcsPersistor.sendStream(bucket, key, ReadStream)
       })
 
       it('should upload the stream', function () {
@@ -368,7 +361,7 @@ describe('GcsPersistorTests', function () {
 
     describe('when a hash is supplied', function () {
       beforeEach(async function () {
-        return GcsPersistor.promises.sendStream(
+        return GcsPersistor.sendStream(
           bucket,
           key,
           ReadStream,
@@ -407,7 +400,7 @@ describe('GcsPersistorTests', function () {
           )
           .yields(genericError)
         try {
-          await GcsPersistor.promises.sendStream(bucket, key, ReadStream)
+          await GcsPersistor.sendStream(bucket, key, ReadStream)
         } catch (err) {
           error = err
         }
@@ -426,7 +419,7 @@ describe('GcsPersistorTests', function () {
   describe('sendFile', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return GcsPersistor.promises.sendFile(bucket, key, filename)
+        return GcsPersistor.sendFile(bucket, key, filename)
       })
 
       it('should create a read stream for the file', function () {
@@ -458,7 +451,7 @@ describe('GcsPersistorTests', function () {
 
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return GcsPersistor.promises.copyObject(bucket, key, destKey)
+        return GcsPersistor.copyObject(bucket, key, destKey)
       })
 
       it('should copy the object', function () {
@@ -474,7 +467,7 @@ describe('GcsPersistorTests', function () {
       beforeEach(async function () {
         GcsFile.copy = sinon.stub().rejects(GcsNotFoundError)
         try {
-          await GcsPersistor.promises.copyObject(bucket, key, destKey)
+          await GcsPersistor.copyObject(bucket, key, destKey)
         } catch (err) {
           error = err
         }
@@ -489,7 +482,7 @@ describe('GcsPersistorTests', function () {
   describe('deleteObject', function () {
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return GcsPersistor.promises.deleteObject(bucket, key)
+        return GcsPersistor.deleteObject(bucket, key)
       })
 
       it('should delete the object', function () {
@@ -505,7 +498,7 @@ describe('GcsPersistorTests', function () {
       beforeEach(async function () {
         GcsFile.delete = sinon.stub().rejects(GcsNotFoundError)
         try {
-          await GcsPersistor.promises.deleteObject(bucket, key)
+          await GcsPersistor.deleteObject(bucket, key)
         } catch (err) {
           error = err
         }
@@ -521,7 +514,7 @@ describe('GcsPersistorTests', function () {
     const directoryName = `${ObjectId()}/${ObjectId()}`
     describe('with valid parameters', function () {
       beforeEach(async function () {
-        return GcsPersistor.promises.deleteDirectory(bucket, directoryName)
+        return GcsPersistor.deleteDirectory(bucket, directoryName)
       })
 
       it('should list the objects in the directory', function () {
@@ -542,7 +535,7 @@ describe('GcsPersistorTests', function () {
       beforeEach(async function () {
         GcsBucket.getFiles = sinon.stub().rejects(genericError)
         try {
-          await GcsPersistor.promises.deleteDirectory(bucket, directoryName)
+          await GcsPersistor.deleteDirectory(bucket, directoryName)
         } catch (err) {
           error = err
         }
@@ -563,7 +556,7 @@ describe('GcsPersistorTests', function () {
       let size
 
       beforeEach(async function () {
-        size = await GcsPersistor.promises.directorySize(bucket, key)
+        size = await GcsPersistor.directorySize(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
@@ -581,7 +574,7 @@ describe('GcsPersistorTests', function () {
 
       beforeEach(async function () {
         GcsBucket.getFiles.resolves([[]])
-        size = await GcsPersistor.promises.directorySize(bucket, key)
+        size = await GcsPersistor.directorySize(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
@@ -600,7 +593,7 @@ describe('GcsPersistorTests', function () {
       beforeEach(async function () {
         GcsBucket.getFiles.rejects(genericError)
         try {
-          await GcsPersistor.promises.directorySize(bucket, key)
+          await GcsPersistor.directorySize(bucket, key)
         } catch (err) {
           error = err
         }
@@ -621,7 +614,7 @@ describe('GcsPersistorTests', function () {
       let exists
 
       beforeEach(async function () {
-        exists = await GcsPersistor.promises.checkIfObjectExists(bucket, key)
+        exists = await GcsPersistor.checkIfObjectExists(bucket, key)
       })
 
       it('should ask the file if it exists', function () {
@@ -640,7 +633,7 @@ describe('GcsPersistorTests', function () {
 
       beforeEach(async function () {
         GcsFile.exists = sinon.stub().resolves([false])
-        exists = await GcsPersistor.promises.checkIfObjectExists(bucket, key)
+        exists = await GcsPersistor.checkIfObjectExists(bucket, key)
       })
 
       it('should get the object header', function () {
@@ -660,7 +653,7 @@ describe('GcsPersistorTests', function () {
       beforeEach(async function () {
         GcsFile.exists = sinon.stub().rejects(genericError)
         try {
-          await GcsPersistor.promises.checkIfObjectExists(bucket, key)
+          await GcsPersistor.checkIfObjectExists(bucket, key)
         } catch (err) {
           error = err
         }
