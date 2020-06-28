@@ -252,22 +252,7 @@ describe('S3PersistorTests', function () {
         })
       })
 
-      it('caches the credentials', async function () {
-        stream = await S3Persistor.getObjectStream(bucket, key)
-
-        expect(S3).to.have.been.calledOnceWith(alternativeS3Credentials)
-      })
-
       it('uses the default credentials for an unknown bucket', async function () {
-        stream = await S3Persistor.getObjectStream('anotherBucket', key)
-
-        expect(S3).to.have.been.calledTwice
-        expect(S3.firstCall).to.have.been.calledWith(alternativeS3Credentials)
-        expect(S3.secondCall).to.have.been.calledWith(defaultS3Credentials)
-      })
-
-      it('caches the default credentials', async function () {
-        stream = await S3Persistor.getObjectStream('anotherBucket', key)
         stream = await S3Persistor.getObjectStream('anotherBucket', key)
 
         expect(S3).to.have.been.calledTwice

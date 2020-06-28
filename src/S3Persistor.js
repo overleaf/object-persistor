@@ -28,9 +28,6 @@ module.exports = class S3Persistor extends AbstractPersistor {
     super()
 
     this.settings = settings
-
-    this._clients = new Map()
-    this._defaultClient = null
   }
 
   async sendFile(bucketName, key, fsPath) {
@@ -312,26 +309,19 @@ module.exports = class S3Persistor extends AbstractPersistor {
     }
   }
 
-  _getClientForBucket(bucket) {
-    if (this._clients[bucket]) {
-      return this._clients[bucket]
-    }
-
+  _getClientForBucket(bucket, clientOptions) {
     if (this.settings.bucketCreds && this.settings.bucketCreds[bucket]) {
-      this._clients[bucket] = new S3(
-        this._buildClientOptions(this.settings.bucketCreds[bucket])
+      return new S3(
+        this._buildClientOptions(
+          this.settings.bucketCreds[bucket],
+          clientOptions
+        )
       )
-      return this._clients[bucket]
     }
 
     // no specific credentials for the bucket
-    if (this._defaultClient) {
-      return this._defaultClient
-    }
-
     if (this.settings.key) {
-      this._defaultClient = new S3(this._buildClientOptions())
-      return this._defaultClient
+      return new S3(this._buildClientOptions(null, clientOptions))
     }
 
     throw new SettingsError({
