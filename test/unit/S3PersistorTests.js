@@ -121,7 +121,7 @@ describe('S3PersistorTests', function () {
           ETag: md5
         })
       }),
-      listObjects: sinon.stub().returns({
+      listObjectsV2: sinon.stub().returns({
         promise: sinon.stub().resolves({
           Contents: files
         })
@@ -630,7 +630,7 @@ describe('S3PersistorTests', function () {
       })
 
       it('should list the objects in the directory', function () {
-        expect(S3Client.listObjects).to.have.been.calledWith({
+        expect(S3Client.listObjectsV2).to.have.been.calledWith({
           Bucket: bucket,
           Prefix: key
         })
@@ -649,14 +649,14 @@ describe('S3PersistorTests', function () {
 
     describe('when there are no files', function () {
       beforeEach(async function () {
-        S3Client.listObjects = sinon
+        S3Client.listObjectsV2 = sinon
           .stub()
           .returns({ promise: sinon.stub().resolves({ Contents: [] }) })
         return S3Persistor.deleteDirectory(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
-        expect(S3Client.listObjects).to.have.been.calledWith({
+        expect(S3Client.listObjectsV2).to.have.been.calledWith({
           Bucket: bucket,
           Prefix: key
         })
@@ -667,11 +667,43 @@ describe('S3PersistorTests', function () {
       })
     })
 
+    describe('when there are more files available', function () {
+      const continuationToken = 'wombat'
+      beforeEach(async function () {
+        S3Client.listObjectsV2.onCall(0).returns({
+          promise: sinon.stub().resolves({
+            Contents: files,
+            IsTruncated: true,
+            NextContinuationToken: continuationToken
+          })
+        })
+
+        return S3Persistor.deleteDirectory(bucket, key)
+      })
+
+      it('should list the objects a second time, with a continuation token', function () {
+        expect(S3Client.listObjectsV2).to.be.calledTwice
+        expect(S3Client.listObjectsV2).to.be.calledWith({
+          Bucket: bucket,
+          Prefix: key
+        })
+        expect(S3Client.listObjectsV2).to.be.calledWith({
+          Bucket: bucket,
+          Prefix: key,
+          ContinuationToken: continuationToken
+        })
+      })
+
+      it('should delete both sets of files', function () {
+        expect(S3Client.deleteObjects).to.have.been.calledTwice
+      })
+    })
+
     describe('when there is an error listing the objects', function () {
       let error
 
       beforeEach(async function () {
-        S3Client.listObjects = sinon
+        S3Client.listObjectsV2 = sinon
           .stub()
           .returns({ promise: sinon.stub().rejects(genericError) })
         try {
@@ -727,7 +759,7 @@ describe('S3PersistorTests', function () {
       })
 
       it('should list the objects in the directory', function () {
-        expect(S3Client.listObjects).to.have.been.calledWith({
+        expect(S3Client.listObjectsV2).to.have.been.calledWith({
           Bucket: bucket,
           Prefix: key
         })
@@ -742,14 +774,14 @@ describe('S3PersistorTests', function () {
       let size
 
       beforeEach(async function () {
-        S3Client.listObjects = sinon
+        S3Client.listObjectsV2 = sinon
           .stub()
           .returns({ promise: sinon.stub().resolves({ Contents: [] }) })
         size = await S3Persistor.directorySize(bucket, key)
       })
 
       it('should list the objects in the directory', function () {
-        expect(S3Client.listObjects).to.have.been.calledWith({
+        expect(S3Client.listObjectsV2).to.have.been.calledWith({
           Bucket: bucket,
           Prefix: key
         })
@@ -760,11 +792,44 @@ describe('S3PersistorTests', function () {
       })
     })
 
+    describe('when there are more files available', function () {
+      const continuationToken = 'wombat'
+      let size
+      beforeEach(async function () {
+        S3Client.listObjectsV2.onCall(0).returns({
+          promise: sinon.stub().resolves({
+            Contents: files,
+            IsTruncated: true,
+            NextContinuationToken: continuationToken
+          })
+        })
+
+        size = await S3Persistor.directorySize(bucket, key)
+      })
+
+      it('should list the objects a second time, with a continuation token', function () {
+        expect(S3Client.listObjectsV2).to.be.calledTwice
+        expect(S3Client.listObjectsV2).to.be.calledWith({
+          Bucket: bucket,
+          Prefix: key
+        })
+        expect(S3Client.listObjectsV2).to.be.calledWith({
+          Bucket: bucket,
+          Prefix: key,
+          ContinuationToken: continuationToken
+        })
+      })
+
+      it('should return the size of both sets of files', function () {
+        expect(size).to.equal(filesSize * 2)
+      })
+    })
+
     describe('when there is an error listing the objects', function () {
       let error
 
       beforeEach(async function () {
-        S3Client.listObjects = sinon
+        S3Client.listObjectsV2 = sinon
           .stub()
           .returns({ promise: sinon.stub().rejects(genericError) })
         try {

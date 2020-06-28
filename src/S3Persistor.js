@@ -143,12 +143,16 @@ module.exports = class S3Persistor extends AbstractPersistor {
     return null
   }
 
-  async deleteDirectory(bucketName, key) {
+  async deleteDirectory(bucketName, key, continuationToken) {
     let response
+    const options = { Bucket: bucketName, Prefix: key }
+    if (continuationToken) {
+      options.ContinuationToken = continuationToken
+    }
 
     try {
       response = await this._getClientForBucket(bucketName)
-        .listObjects({ Bucket: bucketName, Prefix: key })
+        .listObjectsV2(options)
         .promise()
     } catch (err) {
       throw PersistorHelper.wrapError(
@@ -179,6 +183,14 @@ module.exports = class S3Persistor extends AbstractPersistor {
           WriteError
         )
       }
+    }
+
+    if (response.IsTruncated) {
+      await this.deleteDirectory(
+        bucketName,
+        key,
+        response.NextContinuationToken
+      )
     }
   }
 
@@ -265,13 +277,31 @@ module.exports = class S3Persistor extends AbstractPersistor {
     }
   }
 
-  async directorySize(bucketName, key) {
+  async directorySize(bucketName, key, continuationToken) {
     try {
+      const options = {
+        Bucket: bucketName,
+        Prefix: key
+      }
+      if (continuationToken) {
+        options.ContinuationToken = continuationToken
+      }
       const response = await this._getClientForBucket(bucketName)
-        .listObjects({ Bucket: bucketName, Prefix: key })
+        .listObjectsV2(options)
         .promise()
 
-      return response.Contents.reduce((acc, item) => item.Size + acc, 0)
+      const size = response.Contents.reduce((acc, item) => item.Size + acc, 0)
+      if (response.IsTruncated) {
+        return (
+          size +
+          (await this.directorySize(
+            bucketName,
+            key,
+            response.NextContinuationToken
+          ))
+        )
+      }
+      return size
     } catch (err) {
       throw PersistorHelper.wrapError(
         err,
