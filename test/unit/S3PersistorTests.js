@@ -138,7 +138,6 @@ describe('S3PersistorTests', function () {
     Hash = {
       end: sinon.stub(),
       read: sinon.stub().returns(md5),
-      digest: sinon.stub().returns(md5),
       setEncoding: sinon.stub()
     }
     crypto = {
@@ -449,14 +448,9 @@ describe('S3PersistorTests', function () {
       })
 
       it('should meter the stream', function () {
-        expect(Stream.pipeline).to.have.been.calledWith(
-          ReadStream,
+        expect(ReadStream.pipe).to.have.been.calledWith(
           sinon.match.instanceOf(Stream.Transform)
         )
-      })
-
-      it('calculates the md5 hash of the file', function () {
-        expect(Hash.digest).to.have.been.called
       })
     })
 
@@ -470,10 +464,6 @@ describe('S3PersistorTests', function () {
         )
       })
 
-      it('should not calculate the md5 hash of the file', function () {
-        expect(Hash.digest).not.to.have.been.called
-      })
-
       it('sends the hash in base64', function () {
         expect(S3Client.upload).to.have.been.calledWith({
           Bucket: bucket,
@@ -481,10 +471,6 @@ describe('S3PersistorTests', function () {
           Body: sinon.match.instanceOf(Transform),
           ContentMD5: 'qqqqqru7u7uqqqqqu7u7uw=='
         })
-      })
-
-      it('does not fetch the md5 hash of the uploaded file', function () {
-        expect(S3Client.headObject).not.to.have.been.called
       })
     })
 
@@ -505,37 +491,6 @@ describe('S3PersistorTests', function () {
         expect(error).to.be.an.instanceOf(Errors.WriteError)
       })
     })
-
-    describe("when the etag isn't a valid md5 hash", function () {
-      beforeEach(async function () {
-        S3Client.upload = sinon.stub().returns({
-          promise: sinon.stub().resolves({
-            ETag: 'somethingthatisntanmd5',
-            Bucket: bucket,
-            Key: key
-          })
-        })
-
-        await S3Persistor.sendStream(bucket, key, ReadStream)
-      })
-
-      it('should re-fetch the file to verify it', function () {
-        expect(S3Client.getObject).to.have.been.calledWith({
-          Bucket: bucket,
-          Key: key
-        })
-      })
-
-      it('should meter the download', function () {
-        expect(S3ReadStream.pipe).to.have.been.calledWith(
-          sinon.match.instanceOf(Stream.Transform)
-        )
-      })
-
-      it('should calculate the md5 hash from the file', function () {
-        expect(Hash.digest).to.have.been.called
-      })
-    })
   })
 
   describe('sendFile', function () {
@@ -554,6 +509,66 @@ describe('S3PersistorTests', function () {
           Key: key,
           Body: sinon.match.instanceOf(Transform)
         })
+      })
+    })
+  })
+
+  describe('getObjectMd5Hash', function () {
+    describe('when the etag is a valid md5 hash', function () {
+      let hash
+      beforeEach(async function () {
+        hash = await S3Persistor.getObjectMd5Hash(bucket, key)
+      })
+
+      it('should return the object hash', function () {
+        expect(hash).to.equal(md5)
+      })
+
+      it('should get the hash from the object metadata', function () {
+        expect(S3Client.headObject).to.have.been.calledWith({
+          Bucket: bucket,
+          Key: key
+        })
+      })
+
+      it('should not download the object', function () {
+        expect(S3Client.getObject).not.to.have.been.called
+      })
+    })
+
+    describe("when the etag isn't a valid md5 hash", function () {
+      let hash
+      beforeEach(async function () {
+        S3Client.headObject = sinon.stub().returns({
+          promise: sinon.stub().resolves({
+            ETag: 'somethingthatisntanmd5',
+            Bucket: bucket,
+            Key: key
+          })
+        })
+
+        hash = await S3Persistor.getObjectMd5Hash(bucket, key)
+      })
+
+      it('should re-fetch the file to verify it', function () {
+        expect(S3Client.getObject).to.have.been.calledWith({
+          Bucket: bucket,
+          Key: key
+        })
+      })
+
+      it('should meter the download', function () {
+        expect(S3ReadStream.pipe).to.have.been.calledWith(
+          sinon.match.instanceOf(Stream.Transform)
+        )
+      })
+
+      it('should calculate the md5 hash from the file', function () {
+        expect(Hash.read).to.have.been.called
+      })
+
+      it('should return the md5 hash', function () {
+        expect(hash).to.equal(md5)
       })
     })
   })

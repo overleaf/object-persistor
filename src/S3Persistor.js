@@ -13,15 +13,12 @@ const PersistorHelper = require('./PersistorHelper')
 const fs = require('fs')
 const S3 = require('aws-sdk/clients/s3')
 const { URL } = require('url')
-const Stream = require('stream')
-const { promisify } = require('util')
 const {
   WriteError,
   ReadError,
   NotFoundError,
   SettingsError
 } = require('./Errors')
-const pipeline = promisify(Stream.pipeline)
 
 module.exports = class S3Persistor extends AbstractPersistor {
   constructor(settings = {}) {
@@ -41,17 +38,10 @@ module.exports = class S3Persistor extends AbstractPersistor {
         metric: 's3.egress',
         Metrics: this.settings.Metrics
       }
-      let b64Hash
-
-      if (sourceMd5) {
-        b64Hash = PersistorHelper.hexToBase64(sourceMd5)
-      } else {
-        // if there is no supplied md5 hash, we calculate the hash as the data passes through
-        observeOptions.hash = 'md5'
-      }
 
       const observer = new PersistorHelper.ObserverStream(observeOptions)
-      pipeline(readStream, observer)
+      // observer will catch errors, clean up and log a warning
+      readStream.pipe(observer)
 
       // if we have an md5 hash, pass this to S3 to verify the upload
       const uploadOptions = {
@@ -59,37 +49,19 @@ module.exports = class S3Persistor extends AbstractPersistor {
         Key: key,
         Body: observer
       }
-      if (b64Hash) {
-        uploadOptions.ContentMD5 = b64Hash
+
+      // if we have an md5 hash, pass this to S3 to verify the upload - otherwise
+      // we rely on the S3 client's checksum calculation to validate the upload
+      const clientOptions = {}
+      if (sourceMd5) {
+        uploadOptions.ContentMD5 = PersistorHelper.hexToBase64(sourceMd5)
+      } else {
+        clientOptions.computeChecksums = true
       }
 
-      const response = await this._getClientForBucket(bucketName)
+      await this._getClientForBucket(bucketName, clientOptions)
         .upload(uploadOptions, { partSize: this.settings.partSize })
         .promise()
-      let destMd5 = S3Persistor._md5FromResponse(response)
-      if (!destMd5) {
-        // the eTag isn't in md5 format so we need to calculate it ourselves
-        const verifyStream = await this.getObjectStream(
-          response.Bucket,
-          response.Key,
-          {}
-        )
-        destMd5 = await PersistorHelper.calculateStreamMd5(verifyStream)
-      }
-
-      // if we didn't have an md5 hash, we should compare our computed one with S3's
-      // as we couldn't tell S3 about it beforehand
-      if (!sourceMd5) {
-        sourceMd5 = observer.getHash()
-        // throws on mismatch
-        await PersistorHelper.verifyMd5(
-          this,
-          bucketName,
-          key,
-          sourceMd5,
-          destMd5
-        )
-      }
     } catch (err) {
       throw PersistorHelper.wrapError(
         err,
@@ -212,7 +184,17 @@ module.exports = class S3Persistor extends AbstractPersistor {
       const response = await this._getClientForBucket(bucketName)
         .headObject({ Bucket: bucketName, Key: key })
         .promise()
-      return S3Persistor._md5FromResponse(response)
+      const md5 = S3Persistor._md5FromResponse(response)
+      if (md5) {
+        return md5
+      }
+      // etag is not in md5 format
+      if (this.settings.Metrics) {
+        this.settings.Metrics.inc('s3.md5Download')
+      }
+      return PersistorHelper.calculateStreamMd5(
+        await this.getObjectStream(bucketName, key)
+      )
     } catch (err) {
       throw PersistorHelper.wrapError(
         err,
@@ -330,8 +312,8 @@ module.exports = class S3Persistor extends AbstractPersistor {
     })
   }
 
-  _buildClientOptions(bucketCredentials) {
-    const options = {}
+  _buildClientOptions(bucketCredentials, clientOptions) {
+    const options = clientOptions || {}
 
     if (bucketCredentials) {
       options.credentials = {
