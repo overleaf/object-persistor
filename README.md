@@ -13,19 +13,15 @@ Contains a workaround within the GCS backend to allow lifecycle rules to keep ob
 ## Getting started
 
 ```JavaScript
+// import the module
 const ObjectPersistor = require('object-persistor')
 
 const config = {
   // see 'Configuration' section below
 }
-const OP = ObjectPersistor(config)
-// to use the promise-based API specifically
-const persistor = OP.promises
+// create a new persistor
+const Persistor = ObjectPersistor(config)
 ```
-
-## Persistor API
-
-The object returned by `ObjectPersistor()` has a callback API and a promise-based API (under `.promises`). This documentation covers the promises API. For the callback API, the standard convention of a final parameter with either an error as the first parameter and return value as the second applies.
 
 ### Errors
 
@@ -283,7 +279,9 @@ For the `FS` persistor, the `bucketName` should be the full path to the folder o
 
 #### Notes
 
-In order for server-side MD5 generation to work, uploads must be below the `partSize`. Otherwise a multipart upload will be used, and the S3 `eTag` which is used to retrieve the MD5 will not be the MD5 hash of the uploaded object. In these cases, we download the data and calculate the MD5 manually. It is recommended to set this higher than the maximum upload size you wish to support.
+In order for server-side MD5 generation to work, uploads must be below the `partSize`. Otherwise a multipart upload will be used, and the S3 `eTag` which is used to retrieve the MD5 will not be the MD5 hash of the uploaded object. In these cases, we download the data and calculate the MD5 manually.
+
+For verification during upload, we use S3's checksum mechanism to verify the integrity of the uploaded data, but when explicitly retrieving the md5 hash this will download the entire object if its size is above the part size.
 
 ### GCS-specific parameters
 
