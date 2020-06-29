@@ -123,7 +123,7 @@ module.exports = class GcsPersistor extends AbstractPersistor {
         .file(key)
         .getSignedUrl({
           action: 'read',
-          expires: new Date().getTime() + this.settings.signedUrlExpiryInMs
+          expires: Date.now() + this.settings.signedUrlExpiryInMs
         })
       return url
     } catch (err) {
