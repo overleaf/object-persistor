@@ -90,8 +90,7 @@ module.exports = class GcsPersistor extends AbstractPersistor {
     }
   }
 
-  async getObjectStream(bucketName, key, _opts = {}) {
-    const opts = Object.assign({}, _opts)
+  async getObjectStream(bucketName, key, opts = {}) {
     const stream = this.storage
       .bucket(bucketName)
       .file(key)
