@@ -154,7 +154,6 @@ module.exports = class FSPersistor extends AbstractPersistor {
     }
   }
 
-  // this is only called internally for clean-up by `FileHandler` and isn't part of the external API
   async deleteDirectory(location, name) {
     const filteredName = filterName(name.replace(/\/$/, ''))
 
