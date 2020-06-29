@@ -248,7 +248,7 @@ describe('FSPersistorTests', function () {
     it('Should call glob with correct options', async function () {
       await FSPersistor.deleteDirectory(location, files[0])
       expect(glob).to.have.been.calledWith(
-        `${location}/${filteredFilenames[0]}*`
+        `${location}/${filteredFilenames[0]}_*`
       )
     })
 
