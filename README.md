@@ -298,7 +298,7 @@ GCS authentication is configured automatically via the local service account, or
 
 In order to support deletion after a period, the GCS persistor allows usage of a two-bucket system. The main bucket contains the live objects, and on delete the objects are first copied to a 'deleted' bucket, and then deleted from the main one. The 'deleted' bucket is then expected to have a lifecycle policy applied to delete objects after a set period.
 
-In order to facilitate accidental deletion from outside this mechanism, an event-based-hold can be applied by default on the main bucket. This will be unlocked _after_ the object has been copied to the 'deleted' bucket so that the object can then be deleted from the main bucket.
+In order to prevent accidental deletion from outside this mechanism, an event-based-hold can be applied by default on the main bucket. This will be unlocked _after_ the object has been copied to the 'deleted' bucket so that the object can then be deleted from the main bucket.
 
 ## Contributing
 
