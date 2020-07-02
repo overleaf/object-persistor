@@ -208,7 +208,7 @@ module.exports = class MigrationPersistor extends AbstractPersistor {
   }
 
   _getFallbackBucket(bucket) {
-    return this.settings.buckets && this.settings.buckets[bucket] || bucket
+    return (this.settings.buckets && this.settings.buckets[bucket]) || bucket
   }
 
   async _runOnBoth(methodName, bucket, ...moreArgs) {
