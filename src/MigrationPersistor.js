@@ -81,11 +81,15 @@ module.exports = class MigrationPersistor extends AbstractPersistor {
         // start listening on both straight away so that we don't consume bytes
         // in one place before the other
         const returnStream = new Stream.PassThrough()
-        pipeline(fallbackStream, returnStream)
+        pipeline(fallbackStream, returnStream).catch((error) => {
+          Logger.warn({ error }, 'failed to copy object from fallback')
+        })
 
         if (shouldCopy) {
           const copyStream = new Stream.PassThrough()
-          pipeline(fallbackStream, copyStream)
+          pipeline(fallbackStream, copyStream).catch((error) => {
+            Logger.warn({ error }, 'failed to copy object from fallback')
+          })
 
           this._copyStreamFromFallbackAndVerify(
             copyStream,
@@ -93,8 +97,8 @@ module.exports = class MigrationPersistor extends AbstractPersistor {
             bucket,
             key,
             key
-          ).catch(() => {
-            // swallow errors, as this runs in the background and will log a warning
+          ).catch((error) => {
+            Logger.warn({ error }, 'failed to copy file from fallback')
           })
         }
         return returnStream
@@ -116,11 +120,15 @@ module.exports = class MigrationPersistor extends AbstractPersistor {
         )
 
         const copyStream = new Stream.PassThrough()
-        pipeline(fallbackStream, copyStream)
+        pipeline(fallbackStream, copyStream).catch((error) => {
+          Logger.warn({ error }, 'failed to copy object from fallback')
+        })
 
         if (this.settings.copyOnMiss) {
           const missStream = new Stream.PassThrough()
-          pipeline(fallbackStream, missStream)
+          pipeline(fallbackStream, missStream).catch((error) => {
+            Logger.warn({ error }, 'failed to copy object from fallback')
+          })
 
           // copy from sourceKey -> sourceKey
           this._copyStreamFromFallbackAndVerify(
@@ -129,7 +137,7 @@ module.exports = class MigrationPersistor extends AbstractPersistor {
             bucket,
             sourceKey,
             sourceKey
-          ).then(() => {
+          ).catch(() => {
             // swallow errors, as this runs in the background and will log a warning
           })
         }
@@ -195,8 +203,6 @@ module.exports = class MigrationPersistor extends AbstractPersistor {
           }
         }).withCause(err)
       }
-
-      Logger.warn({ error }, 'failed to copy file from fallback')
       throw error
     }
   }
