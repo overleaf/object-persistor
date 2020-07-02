@@ -57,11 +57,12 @@ module.exports = {
 
 // returns a promise which resolves with the md5 hash of the stream
 // - consumes the stream
-function calculateStreamMd5(stream) {
+async function calculateStreamMd5(stream) {
   const hash = Crypto.createHash('md5')
   hash.setEncoding('hex')
 
-  return pipeline(stream, hash).then(() => hash.read())
+  await pipeline(stream, hash)
+  return hash.read()
 }
 
 // verifies the md5 hash of a file against the supplied md5 or the one stored in
