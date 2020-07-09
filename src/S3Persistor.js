@@ -155,18 +155,10 @@ module.exports = class S3Persistor extends AbstractPersistor {
       )
     }
 
-    const objects = response.Contents.map((item) => ({ Key: item.Key }))
-    if (objects.length) {
+    const keys = response.Contents.map((item) => item.Key)
+    if (keys.length) {
       try {
-        await this._getClientForBucket(bucketName)
-          .deleteObjects({
-            Bucket: bucketName,
-            Delete: {
-              Objects: objects,
-              Quiet: true
-            }
-          })
-          .promise()
+        await this._deleteObjects(bucketName, keys)
       } catch (err) {
         throw PersistorHelper.wrapError(
           err,
@@ -370,6 +362,27 @@ module.exports = class S3Persistor extends AbstractPersistor {
     }
 
     return options
+  }
+
+  async _deleteObjects(bucketName, keys) {
+    const client = this._getClientForBucket(bucketName)
+
+    if (this.settings.s3 && this.settings.s3.fakeS3Compatibility) {
+      // fake-s3 doesn't support DeleteObjects, so we need to delete the objects one by one
+      for (const key of keys) {
+        await client.deleteObject({ Bucket: bucketName, Key: key }).promise()
+      }
+    } else {
+      await client
+        .deleteObjects({
+          Bucket: bucketName,
+          Delete: {
+            Objects: keys.map((key) => ({ Key: key })),
+            Quiet: true
+          }
+        })
+        .promise()
+    }
   }
 
   static _md5FromResponse(response) {

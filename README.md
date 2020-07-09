@@ -268,6 +268,7 @@ For the `FS` persistor, the `bucketName` should be the full path to the folder o
 - `s3.maxRetries`: The number of times the S3 client will retry in case of an error
 - `s3.endpoint`: For testing - overrides the S3 endpoint to use a different service (e.g. a fake S3 server)
 - `s3.pathStyle`: For testing - use old path-style URLs, for services that do not support subdomain-based access
+- `s3.fakeS3Compatibility`: For testing - avoid APIs that fake-s3 doesn't support
 
 - `s3BucketCreds`: A JSON-encoded string specifying different S3 credentials for accessing different buckets, in the following format. These credentials override the default ones configured in the main `s3` settings:
 
