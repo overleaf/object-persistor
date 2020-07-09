@@ -353,11 +353,9 @@ module.exports = class S3Persistor extends AbstractPersistor {
       options.s3ForcePathStyle = true
     }
 
-    if (this.settings.s3) {
-      for (const opt of ['httpOptions', 'maxRetries']) {
-        if (this.settings.s3[opt]) {
-          options[opt] = this.settings.s3[opt]
-        }
+    for (const opt of ['httpOptions', 'maxRetries']) {
+      if (this.settings[opt]) {
+        options[opt] = this.settings[opt]
       }
     }
 
@@ -367,7 +365,7 @@ module.exports = class S3Persistor extends AbstractPersistor {
   async _deleteObjects(bucketName, keys) {
     const client = this._getClientForBucket(bucketName)
 
-    if (this.settings.s3 && this.settings.s3.fakeS3Compatibility) {
+    if (this.settings.fakeS3Compatibility) {
       // fake-s3 doesn't support DeleteObjects, so we need to delete the objects one by one
       for (const key of keys) {
         await client.deleteObject({ Bucket: bucketName, Key: key }).promise()
