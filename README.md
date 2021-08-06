@@ -1,3 +1,7 @@
+⚠️ This repository has been migrated into [`overleaf/overleaf`](https://github.com/overleaf/overleaf). See the [monorepo announcement](https://github.com/overleaf/overleaf/issues/923) for more info. ⚠️
+
+---
+
 # @overleaf/object-persistor
 
 Stores arbitrary objects in multiple backends, with support for falling back to a secondary backend if the object can't be found in the primary.
